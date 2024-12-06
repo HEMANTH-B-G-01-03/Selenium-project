@@ -3,51 +3,63 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from dotenv import load_dotenv
+import os
 import time
 
-# Define your Instagram credentials
-INSTAGRAM_USERNAME = "your_username"
-INSTAGRAM_PASSWORD = "your_password"
-HASHTAG = "nature"  # Change this to your desired hashtag
+# Load environment variables from .env file
+load_dotenv()
+USERNAME = os.getenv("user")
+PASSWORD = os.getenv("pass")
 
-# Set up the Selenium WebDriver
-driver = webdriver.Chrome(executable_path="path_to_chromedriver")
+if not USERNAME or not PASSWORD:
+    raise ValueError("Instagram username or password is missing in the .env file.")
+
+# Initialize WebDriver
+driver = webdriver.Chrome()
 
 try:
-    # Open Instagram
-    driver.get("https://www.instagram.com/")
-    WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.NAME, "username")))
+    # Open Instagram login page
+    driver.get("https://www.instagram.com/accounts/login/")
+    
+    # Wait for the login fields to load and enter credentials
+    username_input = WebDriverWait(driver, 10).until(
+        EC.presence_of_element_located((By.NAME, "username"))
+    )
+    username_input.send_keys(USERNAME)
+    password_input = driver.find_element(By.NAME, "password")
+    password_input.send_keys(PASSWORD)
+    password_input.send_keys(Keys.RETURN)
+    
+    # Wait for the homepage to load
+    WebDriverWait(driver, 15).until(
+        EC.presence_of_element_located((By.CSS_SELECTOR, "div[role='feed']"))
+    )
+    print("Login successful. Liking posts on the home screen...")
 
-    # Log in to Instagram
-    driver.find_element(By.NAME, "username").send_keys(INSTAGRAM_USERNAME)
-    driver.find_element(By.NAME, "password").send_keys(INSTAGRAM_PASSWORD, Keys.RETURN)
+    # Scroll and like posts
+    for _ in range(5):  # Adjust the range for more posts
+        # Find all Like buttons (ensure you don't re-like already liked posts)
+        like_buttons = driver.find_elements(
+            By.XPATH, "//button//*[name()='svg' and @aria-label='Like']"
+        )
+        for button in like_buttons:
+            try:
+                button.click()
+                print("Liked a post.")
+                time.sleep(2)  # Small delay to mimic human behavior
+            except Exception as e:
+                print(f"Error while liking a post: {e}")
 
-    # Wait for the login to complete
-    WebDriverWait(driver, 20).until(EC.url_contains("https://www.instagram.com/"))
-
-    # Search for the hashtag
-    driver.get(f"https://www.instagram.com/explore/tags/{HASHTAG}/")
-    WebDriverWait(driver, 10).until(EC.presence_of_all_elements_located((By.CLASS_NAME, "v1Nh3")))
-
-    # Find and interact with posts
-    posts = driver.find_elements(By.CLASS_NAME, "v1Nh3")
-    for post in posts[:10]:  # Limit to the first 10 posts
-        post.click()
+        # Scroll down to load more posts
+        driver.find_element(By.TAG_NAME, "body").send_keys(Keys.PAGE_DOWN)
         time.sleep(2)
 
-        # Like the post
-        try:
-            like_button = WebDriverWait(driver, 10).until(
-                EC.element_to_be_clickable((By.XPATH, "//span[@aria-label='Like']"))
-            )
-            like_button.click()
-        except:
-            print("Post already liked or an error occurred.")
-        
-        # Close the post
-        close_button = driver.find_element(By.XPATH, "//button[@aria-label='Close']")
-        close_button.click()
-        time.sleep(1)
+except Exception as e:
+    print("An error occurred:", e)
 
 finally:
-    driver.quit()
+    print("")
+    # Keep the browser open for debugging purposes
+    # Comment or remove the next line if you want the browser to close:
+    # driver.quit()
